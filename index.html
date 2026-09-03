@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spidy AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#0B0D12;
+    --panel:#12151C;
+    --panel-2:#171B24;
+    --border:#232733;
+    --text:#ECE9E2;
+    --muted:#8A8F9C;
+    --gold:#C9A227;
+    --gold-bright:#E8C468;
+    --thread:rgba(140,150,170,0.09);
+    --danger:#C9604F;
+    --success:#4FA87A;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    overflow:hidden;
+    background-image:
+      linear-gradient(var(--thread) 1px, transparent 1px),
+      linear-gradient(90deg, var(--thread) 1px, transparent 1px);
+    background-size: 42px 42px;
+  }
+  .app{ display:flex; height:100vh; }
+
+  /* Sidebar */
+  .sidebar{
+    width:272px; flex-shrink:0; background:var(--panel);
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; padding:20px 14px;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; padding:4px 6px 22px 6px; }
+  .brand svg{ width:26px; height:26px; flex-shrink:0; }
+  .brand-text{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; letter-spacing:0.2px; }
+  .brand-sub{ font-size:11px; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-top:1px; }
+  .new-chat{
+    display:flex; align-items:center; gap:8px;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    padding:10px 12px; border-radius:10px; font-size:13.5px; font-weight:500;
+    cursor:pointer; transition:border-color 150ms ease, background 150ms ease;
+  }
+  .new-chat:hover{ border-color:var(--gold); background:#1B2029; }
+  .history-label{
+    font-size:11px; color:var(--muted); margin:22px 8px 8px 8px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.3px;
+  }
+  .history{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+  .history-item{
+    padding:9px 10px; border-radius:8px; font-size:13px; color:var(--muted);
+    cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    transition:background 120ms ease, color 120ms ease;
+    display:flex; align-items:center; justify-content:space-between; gap:6px;
+  }
+  .history-item span{ overflow:hidden; text-overflow:ellipsis; }
+  .history-item:hover{ background:var(--panel-2); color:var(--text); }
+  .history-item.active{ background:var(--panel-2); color:var(--text); border-left:2px solid var(--gold); padding-left:8px; }
+  .history-item .del{
+    opacity:0; border:none; background:transparent; color:var(--muted);
+    cursor:pointer; padding:2px 4px; border-radius:4px; font-size:14px; line-height:1;
+  }
+  .history-item:hover .del{ opacity:1; }
+  .history-item .del:hover{ color:var(--danger); }
+  .sidebar-footer{
+    border-top:1px solid var(--border); padding-top:14px;
+    font-size:11.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace; line-height:1.5;
+  }
+  .sidebar-footer b{ color:var(--muted); font-weight:500; }
+
+  /* Main */
+  .main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .topbar{
+    height:56px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px; border-bottom:1px solid var(--border);
+    background:rgba(11,13,18,0.7); backdrop-filter:blur(6px);
+  }
+  .topbar-left{ display:flex; align-items:center; gap:12px; }
+  .menu-btn{
+    display:none; background:transparent; border:1px solid var(--border); color:var(--muted);
+    border-radius:8px; width:36px; height:36px; cursor:pointer; align-items:center; justify-content:center;
+  }
+  .topbar-title{ font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--muted); }
+  .topbar-right{ display:flex; align-items:center; gap:10px; }
+  .topbar-badge{
+    font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--gold-bright);
+    border:1px solid rgba(201,162,39,0.35); padding:3px 9px; border-radius:20px;
+  }
+  .topbar-badge.offline{ color:var(--danger); border-color:rgba(201,96,79,0.4); }
+  .tts-toggle{
+    font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--muted);
+    border:1px solid var(--border); padding:4px 10px; border-radius:20px; cursor:pointer;
+    background:transparent; transition:all 120ms ease;
+  }
+  .tts-toggle.on{ color:var(--gold-bright); border-color:rgba(201,162,39,0.45); }
+
+  .chat-scroll{ flex:1; overflow-y:auto; display:flex; justify-content:center; }
+  .chat-inner{ width:100%; max-width:760px; padding:32px 24px 40px 24px; }
+
+  .empty-state{
+    height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:14px; padding-top:10vh;
+  }
+  .empty-mark{ width:56px; height:56px; opacity:0.9; }
+  .empty-title{ font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; }
+  .empty-sub{ color:var(--muted); font-size:14px; max-width:360px; line-height:1.5; }
+  .suggestions{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:8px; max-width:520px; }
+  .suggestion{
+    border:1px solid var(--border); background:var(--panel); color:var(--muted);
+    font-size:12.5px; padding:8px 14px; border-radius:20px; cursor:pointer;
+    transition:border-color 150ms ease, color 150ms ease;
+  }
+  .suggestion:hover{ border-color:var(--gold); color:var(--text); }
+
+  .msg{ display:flex; gap:12px; margin-bottom:26px; align-items:flex-start; }
+  .msg.user{ flex-direction:row-reverse; }
+  .avatar{
+    width:28px; height:28px; border-radius:8px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:600;
+  }
+  .avatar.ai{ background:linear-gradient(145deg, var(--gold), #8a6d1a); color:#0B0D12; }
+  .avatar.user{ background:var(--panel-2); border:1px solid var(--border); color:var(--muted); }
+  .bubble-wrap{ max-width:calc(100% - 44px); display:flex; flex-direction:column; }
+  .msg.user .bubble-wrap{ align-items:flex-end; }
+  .bubble{
+    font-size:14.5px; line-height:1.65; padding:12px 15px; border-radius:14px;
+  }
+  .msg.ai .bubble{ background:var(--panel); border:1px solid var(--border); border-top-left-radius:4px; }
+  .msg.user .bubble{ background:#1E2530; border:1px solid #2A3140; border-top-right-radius:4px; }
+  .bubble p{ margin:0 0 10px 0; }
+  .bubble p:last-child{ margin-bottom:0; }
+  .bubble pre{
+    background:#0D1017; border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px; overflow-x:auto; font-size:12.5px; margin:10px 0;
+  }
+  .bubble code{ font-family:'IBM Plex Mono',monospace; }
+  .bubble :not(pre) > code{ background:#0D1017; padding:1px 5px; border-radius:5px; font-size:12.5px; }
+  .bubble ul,.bubble ol{ margin:6px 0; padding-left:20px; }
+  .bubble img.attach-preview{ max-width:240px; border-radius:10px; margin-top:8px; display:block; }
+
+  .attach-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .attach-chip{
+    font-size:11.5px; background:var(--panel-2); border:1px solid var(--border);
+    border-radius:8px; padding:4px 8px; color:var(--muted); display:flex; align-items:center; gap:6px;
+  }
+  .attach-chip img{ width:20px; height:20px; object-fit:cover; border-radius:4px; }
+
+  .msg-actions{ display:flex; gap:6px; margin-top:6px; opacity:0; transition:opacity 120ms ease; }
+  .msg:hover .msg-actions{ opacity:1; }
+  .msg.user .msg-actions{ justify-content:flex-end; }
+  .action-btn{
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    border-radius:7px; padding:4px 9px; font-size:11px; cursor:pointer;
+    display:flex; align-items:center; gap:5px; font-family:'Inter',sans-serif;
+    transition:border-color 120ms ease, color 120ms ease;
+  }
+  .action-btn:hover{ border-color:var(--gold); color:var(--text); }
+  .action-btn.copied-flash{ border-color:var(--gold); color:var(--gold-bright); }
+  .action-btn svg{ width:12px; height:12px; flex-shrink:0; }
+
+  .edit-box{ width:100%; }
+  .edit-box textarea{
+    width:100%; background:#1E2530; border:1px solid #2A3140; border-radius:12px;
+    color:var(--text); font-family:'Inter',sans-serif; font-size:14.5px;
+    line-height:1.5; padding:12px 15px; resize:vertical; min-height:60px; outline:none;
+  }
+  .edit-box textarea:focus{ border-color:var(--gold); }
+  .edit-actions{ display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .edit-btn{
+    padding:7px 14px; border-radius:8px; font-size:12.5px; cursor:pointer;
+    border:1px solid var(--border); background:transparent; color:var(--muted);
+    font-family:'Inter',sans-serif; transition:border-color 120ms ease, color 120ms ease, background 120ms ease;
+  }
+  .edit-btn:hover{ color:var(--text); border-color:var(--gold); }
+  .edit-btn.primary{ background:var(--gold); color:#0B0D12; border-color:var(--gold); font-weight:600; }
+  .edit-btn.primary:hover{ background:var(--gold-bright); border-color:var(--gold-bright); }
+
+  .typing{ display:flex; gap:4px; padding:4px 0; }
+  .typing span{
+    width:6px; height:6px; border-radius:50%; background:var(--gold);
+    animation: bounce 1.1s infinite ease-in-out;
+  }
+  .typing span:nth-child(2){ animation-delay:0.15s; }
+  .typing span:nth-child(3){ animation-delay:0.3s; }
+  @keyframes bounce{ 0%,60%,100%{ transform:translateY(0); opacity:0.5;} 30%{ transform:translateY(-4px); opacity:1;} }
+
+  /* Composer */
+  .composer-wrap{
+    display:flex; justify-content:center;
+    padding:0 24px 18px 24px; flex-shrink:0;
+  }
+  .composer-shell{ width:100%; max-width:760px; }
+  .file-preview-bar{
+    display:none; flex-wrap:wrap; gap:8px; margin-bottom:10px;
+    padding:10px 12px; background:var(--panel); border:1px solid var(--border); border-radius:12px;
+  }
+  .file-preview-bar.show{ display:flex; }
+  .file-pill{
+    display:flex; align-items:center; gap:8px;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:10px;
+    padding:6px 10px; font-size:12px; color:var(--muted); max-width:220px;
+  }
+  .file-pill img{ width:28px; height:28px; object-fit:cover; border-radius:6px; }
+  .file-pill .name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-pill .rm{
+    border:none; background:transparent; color:var(--muted); cursor:pointer;
+    font-size:14px; line-height:1; padding:2px;
+  }
+  .file-pill .rm:hover{ color:var(--danger); }
+
+  .composer{
+    width:100%; background:var(--panel); border:1px solid var(--border);
+    border-radius:16px; display:flex; align-items:flex-end; gap:6px;
+    padding:10px 10px 10px 12px; transition:border-color 150ms ease;
+  }
+  .composer:focus-within{ border-color:var(--gold); }
+  .composer-tools{ display:flex; gap:4px; align-items:center; padding-bottom:2px; }
+  .tool-btn{
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    background:transparent; border:1px solid transparent; color:var(--muted);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:all 120ms ease;
+  }
+  .tool-btn:hover{ color:var(--text); border-color:var(--border); background:var(--panel-2); }
+  .tool-btn.recording{
+    color:#fff; background:var(--danger); border-color:var(--danger);
+    animation: pulse-rec 1.2s ease infinite;
+  }
+  @keyframes pulse-rec{ 0%,100%{ opacity:1; } 50%{ opacity:0.75; } }
+  .tool-btn svg{ width:18px; height:18px; }
+
+  .composer textarea{
+    flex:1; background:transparent; border:none; outline:none; resize:none;
+    color:var(--text); font-family:'Inter',sans-serif; font-size:14.5px;
+    line-height:1.5; max-height:160px; padding:8px 0; min-height:36px;
+  }
+  .composer textarea::placeholder{ color:var(--muted); }
+  .send-btn{
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    background:var(--gold); border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 150ms ease, transform 100ms ease;
+  }
+  .send-btn:hover{ background:var(--gold-bright); }
+  .send-btn:active{ transform:scale(0.94); }
+  .send-btn:disabled{ background:var(--border); cursor:not-allowed; }
+  .send-btn.stop{ background:var(--danger); }
+  .send-btn svg{ width:16px; height:16px; }
+
+  .composer-hint{
+    text-align:center; font-size:11px; color:var(--muted);
+    margin-top:8px; font-family:'IBM Plex Mono',monospace;
+  }
+
+  .error-banner{
+    max-width:760px; margin:0 auto 14px auto;
+    background:rgba(201,96,79,0.1); border:1px solid rgba(201,96,79,0.35);
+    color:#E5A297; font-size:13px; padding:10px 14px; border-radius:10px;
+  }
+
+  .voice-status{
+    display:none; align-items:center; gap:8px; justify-content:center;
+    font-size:12px; color:var(--gold-bright); margin-bottom:8px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .voice-status.show{ display:flex; }
+  .voice-dot{
+    width:8px; height:8px; border-radius:50%; background:var(--danger);
+    animation: pulse-rec 1s ease infinite;
+  }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  @media (max-width: 720px){
+    .sidebar{
+      position:fixed; z-index:20; height:100vh; transform:translateX(-100%);
+      transition:transform 200ms ease; box-shadow:4px 0 24px rgba(0,0,0,0.4);
+    }
+    .sidebar.open{ transform:translateX(0); }
+    .menu-btn{ display:flex; }
+    .chat-inner{ padding:20px 14px 30px 14px; }
+    .composer-wrap{ padding:0 12px 14px 12px; }
+    .sidebar-backdrop{
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:15;
+    }
+    .sidebar-backdrop.show{ display:block; }
+  }
+</style>
+</head>
+<body>
+<div class="sidebar-backdrop" id="backdrop"></div>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="15" stroke="#C9A227" stroke-width="1.4"/>
+        <path d="M16 3 L16 29 M4.5 9 L27.5 23 M4.5 23 L27.5 9 M6 16 L26 16" stroke="#C9A227" stroke-width="1" opacity="0.55"/>
+        <circle cx="16" cy="16" r="3.4" fill="#C9A227"/>
+      </svg>
+      <div>
+        <div class="brand-text">Spidy AI</div>
+        <div class="brand-sub">built by S. Bhuvanesh</div>
+      </div>
+    </div>
+
+    <div class="new-chat" id="newChatBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      New chat
+    </div>
+
+    <div class="history-label">RECENT</div>
+    <div class="history" id="historyList"></div>
+
+    <div class="sidebar-footer">
+      <div><b>Spidy AI</b> — created by S. Bhuvanesh</div>
+      <div>sbhuvanesh713@gmail.com</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="menu-btn" id="menuBtn" title="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="topbar-title" id="topbarTitle">New conversation</div>
+      </div>
+      <div class="topbar-right">
+        <button class="tts-toggle" id="ttsToggle" title="Read replies aloud">🔊 TTS off</button>
+        <div class="topbar-badge" id="liveBadge">● live</div>
+      </div>
+    </div>
+
+    <div class="chat-scroll" id="chatScroll">
+      <div class="chat-inner" id="chatInner">
+        <div class="empty-state" id="emptyState">
+          <svg class="empty-mark" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="15" stroke="#C9A227" stroke-width="1.2"/>
+            <path d="M16 3 L16 29 M4.5 9 L27.5 23 M4.5 23 L27.5 9 M6 16 L26 16" stroke="#C9A227" stroke-width="0.9" opacity="0.5"/>
+            <circle cx="16" cy="16" r="3.2" fill="#C9A227"/>
+          </svg>
+          <div class="empty-title">Spidy AI</div>
+          <div class="empty-sub">Ask anything — coding, writing, ideas. Attach files or talk with voice.</div>
+          <div class="suggestions">
+            <div class="suggestion">Explain quantum computing simply</div>
+            <div class="suggestion">Write a Python script to rename files</div>
+            <div class="suggestion">Give me a 3-day Tokyo itinerary</div>
+            <div class="suggestion">Review this code for bugs</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer-shell">
+        <div id="errorSlot"></div>
+        <div class="voice-status" id="voiceStatus">
+          <span class="voice-dot"></span>
+          <span id="voiceStatusText">Listening…</span>
+        </div>
+        <div class="file-preview-bar" id="filePreviewBar"></div>
+        <div class="composer">
+          <div class="composer-tools">
+            <button class="tool-btn" id="attachBtn" title="Attach files (images, PDF, code, docs)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+            </button>
+            <button class="tool-btn" id="micBtn" title="Voice input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </button>
+          </div>
+          <textarea id="input" rows="1" placeholder="Message Spidy AI… (Shift+Enter for newline)"></textarea>
+          <button class="send-btn" id="sendBtn" title="Send">
+            <svg id="sendIcon" viewBox="0 0 24 24" fill="none" stroke="#0B0D12" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+        <div class="composer-hint">Spidy AI can make mistakes. Verify important information · Files & voice supported</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.docx,.doc" style="display:none">
+
+<script>
+marked.setOptions({
+  breaks: true,
+  highlight: (code, lang) => {
+    try { return hljs.highlight(code, { language: lang || 'plaintext' }).value; }
+    catch (e) { return code; }
+  }
+});
+
+const STORAGE_KEY = 'spidy_conversations_v2';
+const API_BASE = ''; // same origin
+
+let conversations = [];
+let activeId = null;
+let editingIndex = null;
+let pendingFiles = []; // { id, name, size, mime, isImage, previewUrl? }
+let isStreaming = false;
+let abortController = null;
+let ttsEnabled = localStorage.getItem('spidy_tts') === '1';
+let recognition = null;
+let isListening = false;
+
+// —— Storage (localStorage; no window.storage dependency) ——
+function loadConversations() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    conversations = raw ? JSON.parse(raw) : [];
+  } catch (e) { conversations = []; }
+  renderHistory();
+  if (conversations.length && !activeId) {
+    activeId = conversations[0].id;
+    renderChat();
+  }
+}
+
+function saveConversations() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations)); }
+  catch (e) { /* quota */ }
+}
+
+function newConversation() {
+  const convo = { id: Date.now().toString(), title: 'New conversation', messages: [] };
+  conversations.unshift(convo);
+  activeId = convo.id;
+  editingIndex = null;
+  pendingFiles = [];
+  renderFilePreview();
+  renderHistory();
+  renderChat();
+  saveConversations();
+  closeSidebar();
+}
+
+function getActive() { return conversations.find(c => c.id === activeId); }
+
+function deleteConversation(id, e) {
+  e.stopPropagation();
+  conversations = conversations.filter(c => c.id !== id);
+  if (activeId === id) {
+    activeId = conversations[0]?.id || null;
+  }
+  saveConversations();
+  renderHistory();
+  renderChat();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '';
+  conversations.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'history-item' + (c.id === activeId ? ' active' : '');
+    el.innerHTML = `<span>${escapeHtml(c.title || 'New conversation')}</span>`;
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.title = 'Delete';
+    del.textContent = '×';
+    del.onclick = (e) => deleteConversation(c.id, e);
+    el.appendChild(del);
+    el.onclick = () => {
+      activeId = c.id;
+      editingIndex = null;
+      pendingFiles = [];
+      renderFilePreview();
+      renderHistory();
+      renderChat();
+      closeSidebar();
+    };
+    list.appendChild(el);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderChat() {
+  const inner = document.getElementById('chatInner');
+  const convo = getActive();
+  document.getElementById('topbarTitle').textContent = convo ? (convo.title || 'New conversation') : 'New conversation';
+
+  if (!convo || convo.messages.length === 0) {
+    inner.innerHTML = document.getElementById('emptyState').outerHTML;
+    attachSuggestionHandlers();
+    return;
+  }
+  inner.innerHTML = '';
+  const lastIdx = convo.messages.length - 1;
+  convo.messages.forEach((m, idx) => {
+    const isLastAI = idx === lastIdx && m.role !== 'user';
+    inner.appendChild(buildMsgEl(m.role, m.content, {
+      index: idx,
+      isLastAI,
+      isEditing: idx === editingIndex,
+      attachments: m.attachments || [],
+    }));
+  });
+  scrollToBottom();
+}
+
+function attachSuggestionHandlers() {
+  document.querySelectorAll('.suggestion').forEach(s => {
+    s.onclick = () => {
+      document.getElementById('input').value = s.textContent;
+      handleSend();
+    };
+  });
+}
+
+function buildMsgEl(role, content, opts = {}) {
+  const { isTyping = false, index = null, isLastAI = false, isEditing = false, attachments = [] } = opts;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar ' + (role === 'user' ? 'user' : 'ai');
+  avatar.textContent = role === 'user' ? 'You' : 'S';
+  const bubbleWrap = document.createElement('div');
+  bubbleWrap.className = 'bubble-wrap';
+
+  if (isEditing) {
+    const box = document.createElement('div');
+    box.className = 'edit-box';
+    const ta = document.createElement('textarea');
+    ta.value = content;
+    ta.rows = Math.min(10, Math.max(2, Math.ceil(content.length / 50)));
+    const actions = document.createElement('div');
+    actions.className = 'edit-actions';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'edit-btn';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = cancelEdit;
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'edit-btn primary';
+    saveBtn.textContent = 'Save & submit';
+    saveBtn.onclick = () => { const v = ta.value.trim(); if (v) saveEdit(index, v); };
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+    box.appendChild(ta);
+    box.appendChild(actions);
+    bubbleWrap.appendChild(box);
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubbleWrap);
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 0);
+    return wrap;
+  }
+
+  if (attachments.length) {
+    const chips = document.createElement('div');
+    chips.className = 'attach-chips';
+    attachments.forEach(a => {
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      if (a.isImage && a.previewUrl) {
+        chip.innerHTML = `<img src="${a.previewUrl}" alt=""><span>${escapeHtml(a.name)}</span>`;
+      } else {
+        chip.innerHTML = `<span>📎 ${escapeHtml(a.name)}</span>`;
+      }
+      chips.appendChild(chip);
+    });
+    bubbleWrap.appendChild(chips);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  if (isTyping) {
+    bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  } else if (role === 'user') {
+    bubble.textContent = content;
+  } else {
+    bubble.innerHTML = marked.parse(content || '');
+  }
+  bubbleWrap.appendChild(bubble);
+
+  if (!isTyping) {
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'msg-actions';
+
+    if (role === 'user') {
+      const editBtn = makeActionBtn('Edit', ICON_EDIT);
+      editBtn.onclick = () => { editingIndex = index; renderChat(); };
+      actionsRow.appendChild(editBtn);
+    } else {
+      const copyBtn = makeActionBtn('Copy', ICON_COPY);
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(content).then(() => {
+          copyBtn.classList.add('copied-flash');
+          copyBtn.querySelector('span').textContent = 'Copied';
+          setTimeout(() => {
+            copyBtn.classList.remove('copied-flash');
+            copyBtn.querySelector('span').textContent = 'Copy';
+          }, 1500);
+        });
+      };
+      actionsRow.appendChild(copyBtn);
+
+      const speakBtn = makeActionBtn('Speak', ICON_SPEAK);
+      speakBtn.onclick = () => speakText(content);
+      actionsRow.appendChild(speakBtn);
+
+      if (isLastAI) {
+        const regenBtn = makeActionBtn('Regenerate', ICON_REGEN);
+        regenBtn.onclick = regenerateLast;
+        actionsRow.appendChild(regenBtn);
+      }
+    }
+    bubbleWrap.appendChild(actionsRow);
+  }
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubbleWrap);
+  return wrap;
+}
+
+const ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const ICON_REGEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+const ICON_SPEAK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" fill="#0B0D12"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+const ICON_SEND = '<svg id="sendIcon" viewBox="0 0 24 24" fill="none" stroke="#0B0D12" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+
+function makeActionBtn(label, svg) {
+  const btn = document.createElement('button');
+  btn.className = 'action-btn';
+  btn.innerHTML = svg + '<span>' + label + '</span>';
+  return btn;
+}
+
+function cancelEdit() {
+  editingIndex = null;
+  renderChat();
+}
+
+function saveEdit(index, newText) {
+  const convo = getActive();
+  if (!convo) return;
+  convo.messages = convo.messages.slice(0, index);
+  convo.messages.push({ role: 'user', content: newText });
+  editingIndex = null;
+  saveConversations();
+  renderHistory();
+  renderChat();
+  requestAIReply(convo);
+}
+
+function regenerateLast() {
+  const convo = getActive();
+  if (!convo || convo.messages.length === 0) return;
+  if (convo.messages[convo.messages.length - 1].role !== 'user') {
+    convo.messages.pop();
+  }
+  saveConversations();
+  renderChat();
+  requestAIReply(convo);
+}
+
+function scrollToBottom() {
+  const scroll = document.getElementById('chatScroll');
+  requestAnimationFrame(() => { scroll.scrollTop = scroll.scrollHeight; });
+}
+
+function showError(msg) {
+  document.getElementById('errorSlot').innerHTML = `<div class="error-banner">${escapeHtml(msg)}</div>`;
+  setTimeout(() => { document.getElementById('errorSlot').innerHTML = ''; }, 7000);
+}
+
+// —— Files ——
+function renderFilePreview() {
+  const bar = document.getElementById('filePreviewBar');
+  if (!pendingFiles.length) {
+    bar.classList.remove('show');
+    bar.innerHTML = '';
+    return;
+  }
+  bar.classList.add('show');
+  bar.innerHTML = '';
+  pendingFiles.forEach((f, i) => {
+    const pill = document.createElement('div');
+    pill.className = 'file-pill';
+    const name = escapeHtml(f.name);
+    if (f.isImage && f.previewUrl) {
+      pill.innerHTML = `<img src="${f.previewUrl}" alt=""><span class="name">${name}</span>`;
+    } else {
+      pill.innerHTML = `<span>📎</span><span class="name">${name}</span>`;
+    }
+    const rm = document.createElement('button');
+    rm.className = 'rm';
+    rm.textContent = '×';
+    rm.onclick = () => {
+      if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
+      pendingFiles.splice(i, 1);
+      renderFilePreview();
+    };
+    pill.appendChild(rm);
+    bar.appendChild(pill);
+  });
+}
+
+document.getElementById('attachBtn').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = async (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if (!files.length) return;
+
+  const fd = new FormData();
+  files.forEach(f => fd.append('files', f));
+
+  try {
+    const res = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+    data.files.forEach((meta, idx) => {
+      const local = files[idx];
+      const item = {
+        id: meta.id,
+        name: meta.name,
+        size: meta.size,
+        mime: meta.mime,
+        isImage: meta.isImage,
+        previewUrl: meta.isImage ? URL.createObjectURL(local) : null,
+      };
+      pendingFiles.push(item);
+    });
+    renderFilePreview();
+  } catch (err) {
+    showError(err.message || 'Could not upload files');
+  }
+};
+
+// —— Voice (Web Speech API) ——
+function initSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = true;
+  r.lang = navigator.language || 'en-US';
+  r.onstart = () => {
+    isListening = true;
+    document.getElementById('micBtn').classList.add('recording');
+    document.getElementById('voiceStatus').classList.add('show');
+    document.getElementById('voiceStatusText').textContent = 'Listening…';
+  };
+  r.onend = () => {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('recording');
+    document.getElementById('voiceStatus').classList.remove('show');
+  };
+  r.onerror = (ev) => {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('recording');
+    document.getElementById('voiceStatus').classList.remove('show');
+    if (ev.error !== 'aborted' && ev.error !== 'no-speech') {
+      showError('Voice error: ' + ev.error + ' (use Chrome/Edge & allow mic)');
+    }
+  };
+  r.onresult = (ev) => {
+    let interim = '';
+    let final = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const input = document.getElementById('input');
+    if (final) {
+      input.value = (input.value ? input.value + ' ' : '') + final.trim();
+      autoResize();
+      document.getElementById('voiceStatusText').textContent = 'Got it';
+    } else if (interim) {
+      document.getElementById('voiceStatusText').textContent = interim;
+    }
+  };
+  return r;
+}
+
+recognition = initSpeech();
+
+document.getElementById('micBtn').onclick = () => {
+  if (!recognition) {
+    showError('Speech recognition not supported in this browser. Try Chrome or Edge.');
+    return;
+  }
+  if (isListening) {
+    recognition.stop();
+    return;
+  }
+  try { recognition.start(); }
+  catch (e) { showError('Could not start mic: ' + e.message); }
+};
+
+// TTS
+function updateTtsBtn() {
+  const btn = document.getElementById('ttsToggle');
+  btn.textContent = ttsEnabled ? '🔊 TTS on' : '🔊 TTS off';
+  btn.classList.toggle('on', ttsEnabled);
+}
+updateTtsBtn();
+
+document.getElementById('ttsToggle').onclick = () => {
+  ttsEnabled = !ttsEnabled;
+  localStorage.setItem('spidy_tts', ttsEnabled ? '1' : '0');
+  updateTtsBtn();
+  if (!ttsEnabled) window.speechSynthesis?.cancel();
+};
+
+function speakText(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const plain = text.replace(/```[\s\S]*?```/g, ' code block ').replace(/[#*_`>~]/g, ' ').slice(0, 3000);
+  const u = new SpeechSynthesisUtterance(plain);
+  u.rate = 1.05;
+  window.speechSynthesis.speak(u);
+}
+
+// —— Chat ——
+async function handleSend() {
+  if (isStreaming) {
+    stopStreaming();
+    return;
+  }
+  const input = document.getElementById('input');
+  const text = input.value.trim();
+  if (!text && !pendingFiles.length) return;
+
+  if (!activeId) newConversation();
+  const convo = getActive();
+
+  if (convo.messages.length === 0) {
+    const titleSrc = text || pendingFiles[0]?.name || 'New conversation';
+    convo.title = titleSrc.length > 38 ? titleSrc.slice(0, 38) + '…' : titleSrc;
+  }
+
+  const attachments = pendingFiles.map(f => ({
+    id: f.id,
+    name: f.name,
+    isImage: f.isImage,
+    previewUrl: f.previewUrl,
+  }));
+  const fileIds = pendingFiles.map(f => f.id);
+
+  convo.messages.push({
+    role: 'user',
+    content: text || (pendingFiles.length ? '(see attached files)' : ''),
+    attachments,
+    fileIds,
+  });
+
+  input.value = '';
+  autoResize();
+  pendingFiles = [];
+  renderFilePreview();
+  renderHistory();
+  renderChat();
+
+  await requestAIReply(convo);
+}
+
+function setStreamingUI(on) {
+  isStreaming = on;
+  const btn = document.getElementById('sendBtn');
+  if (on) {
+    btn.classList.add('stop');
+    btn.innerHTML = ICON_STOP;
+    btn.disabled = false;
+  } else {
+    btn.classList.remove('stop');
+    btn.innerHTML = ICON_SEND;
+    btn.disabled = false;
+  }
+}
+
+function stopStreaming() {
+  if (abortController) abortController.abort();
+  abortController = null;
+  setStreamingUI(false);
+}
+
+async function requestAIReply(convo) {
+  const inner = document.getElementById('chatInner');
+  // Remove empty state if present
+  if (convo.messages.filter(m => m.role === 'assistant').length === 0 && convo.messages.length === 1) {
+    // already rendered user msg
+  }
+
+  const typingEl = buildMsgEl('ai', '', { isTyping: true });
+  inner.appendChild(typingEl);
+  scrollToBottom();
+  setStreamingUI(true);
+  abortController = new AbortController();
+
+  const apiMessages = convo.messages.map(m => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: m.content,
+  }));
+  // Collect file ids from last user message
+  const lastUser = [...convo.messages].reverse().find(m => m.role === 'user');
+  const fileIds = lastUser?.fileIds || [];
+
+  let fullText = '';
+
+  try {
+    const res = await fetch(API_BASE + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: abortController.signal,
+      body: JSON.stringify({
+        messages: apiMessages,
+        fileIds,
+        stream: true,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.detail || `HTTP ${res.status}`);
+    }
+
+    // Replace typing with live bubble
+    typingEl.remove();
+    const liveEl = buildMsgEl('ai', '', { isTyping: false, isLastAI: true });
+    const liveBubble = liveEl.querySelector('.bubble');
+    liveBubble.innerHTML = '';
+    inner.appendChild(liveEl);
+    scrollToBottom();
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = parts.pop() || '';
+
+      for (const line of parts) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(payload);
+          if (evt.type === 'text' && evt.text) {
+            fullText += evt.text;
+            liveBubble.innerHTML = marked.parse(fullText);
+            scrollToBottom();
+          } else if (evt.type === 'error') {
+            throw new Error(evt.error?.message || evt.error || 'Stream error');
+          }
+        } catch (parseErr) {
+          if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr;
+        }
+      }
+    }
+
+    if (!fullText) fullText = "Sorry, I couldn't generate a response just now.";
+    convo.messages.push({ role: 'assistant', content: fullText });
+    saveConversations();
+    renderChat();
+
+    if (ttsEnabled) speakText(fullText);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      if (fullText) {
+        convo.messages.push({ role: 'assistant', content: fullText + '\n\n*(stopped)*' });
+        saveConversations();
+      }
+      renderChat();
+    } else {
+      typingEl.remove();
+      showError(err.message || 'Something went wrong reaching Spidy AI.');
+      renderChat();
+    }
+  } finally {
+    setStreamingUI(false);
+    abortController = null;
+  }
+}
+
+function autoResize() {
+  const input = document.getElementById('input');
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+}
+
+// Health check
+async function checkHealth() {
+  try {
+    const res = await fetch(API_BASE + '/api/health');
+    const data = await res.json();
+    const badge = document.getElementById('liveBadge');
+    if (data.ok && data.hasKey) {
+      badge.textContent = '● live';
+      badge.classList.remove('offline');
+    } else if (data.ok && !data.hasKey) {
+      badge.textContent = '● no API key';
+      badge.classList.add('offline');
+    } else {
+      badge.textContent = '● offline';
+      badge.classList.add('offline');
+    }
+  } catch {
+    document.getElementById('liveBadge').textContent = '● offline';
+    document.getElementById('liveBadge').classList.add('offline');
+  }
+}
+
+// Mobile sidebar
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('backdrop').classList.remove('show');
+}
+document.getElementById('menuBtn').onclick = () => {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('backdrop').classList.toggle('show');
+};
+document.getElementById('backdrop').onclick = closeSidebar;
+
+document.getElementById('sendBtn').addEventListener('click', handleSend);
+document.getElementById('input').addEventListener('input', autoResize);
+document.getElementById('input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+});
+document.getElementById('newChatBtn').addEventListener('click', newConversation);
+
+loadConversations();
+checkHealth();
+</script>
+</body>
+</html>
